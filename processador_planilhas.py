@@ -6,9 +6,27 @@ import os
 
 # --- LÓGICA PRINCIPAL DE PROCESSAMENTO ---
 def processar_arquivos(lista_de_arquivos, status_callback, done_callback):
-    """
-    Função que combina, filtra, remove colunas e prepara para salvar os arquivos CSV.
-    Executada em uma thread para não travar a interface.
+    """Combina, filtra e processa uma lista de arquivos CSV.
+
+    Esta função é projetada para ser executada em uma thread separada para não
+    bloquear a interface do usuário. Ela realiza as seguintes operações:
+    1.  Lê e combina múltiplos arquivos CSV em um único DataFrame do pandas.
+    2.  Tenta detectar automaticamente o separador (';' ou ',').
+    3.  Filtra o DataFrame combinado para remover linhas contendo e-mails de
+        domínios específicos ('@colegiocarbonell.com.br', '@soucarbonell.com.br').
+    4.  Remove as três primeiras colunas (A, B, C) do DataFrame resultante.
+    5.  Invoca callbacks para atualizar o status na interface e para retornar
+        o resultado final ou um erro.
+
+    Args:
+        lista_de_arquivos (list[str]): Uma lista de caminhos para os arquivos CSV
+            a serem processados.
+        status_callback (callable): Uma função de callback que aceita uma string
+            para atualizar a mensagem de status na interface do usuário.
+        done_callback (callable): Uma função de callback que é chamada na conclusão.
+            Recebe dois argumentos: um booleano `sucesso` e o `resultado`,
+            que é o DataFrame final em caso de sucesso ou uma mensagem de erro
+            (string) em caso de falha.
     """
     try:
         # --- ETAPA 1: COMBINAR ARQUIVOS ---
@@ -77,7 +95,27 @@ def processar_arquivos(lista_de_arquivos, status_callback, done_callback):
 
 # --- INTERFACE GRÁFICA (GUI) ---
 class App:
+    """A classe principal da aplicação de interface gráfica (GUI).
+
+    Esta classe encapsula todos os elementos da interface do usuário (widgets)
+    e a lógica para interagir com o usuário, como seleção de arquivos,
+    início do processamento e exibição de status.
+
+    Attributes:
+        root (tk.Tk): A janela raiz da aplicação Tkinter.
+        lista_de_arquivos (list[str]): Uma lista para armazenar os caminhos dos
+            arquivos CSV selecionados pelo usuário.
+        label_arquivo (ttk.Label): Widget para exibir o número de arquivos selecionados.
+        btn_selecionar (ttk.Button): Botão para abrir o diálogo de seleção de arquivos.
+        btn_processar (ttk.Button): Botão para iniciar o processamento dos arquivos.
+        status_label (ttk.Label): Widget para exibir mensagens de status ao usuário.
+    """
     def __init__(self, root):
+        """Inicializa a aplicação App.
+
+        Args:
+            root (tk.Tk): A janela principal (root) da aplicação Tkinter.
+        """
         self.root = root
         self.root.title("Combinador e Filtro de Leads Carbonell")
         self.root.geometry("550x300")
@@ -110,6 +148,11 @@ class App:
         self.status_label.pack(pady=(15, 0))
 
     def selecionar_arquivos(self):
+        """Abre uma caixa de diálogo para o usuário selecionar múltiplos arquivos CSV.
+
+        Atualiza a interface para mostrar o número de arquivos selecionados e
+        habilita o botão de processamento.
+        """
         # Abre a janela para seleção de MÚLTIPLOS arquivos CSV
         f_paths = filedialog.askopenfilenames(
             title="Selecione as planilhas CSV para combinar",
@@ -122,6 +165,11 @@ class App:
             self.status_label.config(text="Arquivos prontos para processar.")
 
     def iniciar_processamento(self):
+        """Inicia o processo de combinação e filtragem dos arquivos selecionados.
+
+        Desabilita os botões da interface e inicia a função `processar_arquivos`
+        em uma nova thread para evitar o congelamento da GUI.
+        """
         if not self.lista_de_arquivos:
             messagebox.showwarning("Aviso", "Por favor, selecione os arquivos primeiro.")
             return
@@ -137,9 +185,29 @@ class App:
         thread.start()
 
     def atualizar_status(self, mensagem):
+        """Atualiza a label de status na interface.
+
+        Esta função é usada como callback pela thread de processamento.
+
+        Args:
+            mensagem (str): A nova mensagem de status a ser exibida.
+        """
         self.status_label.config(text=mensagem)
 
     def processamento_concluido(self, sucesso, resultado):
+        """Manipula o resultado do processamento.
+
+        Esta função é o callback final da thread de processamento. Se o
+        processo for bem-sucedido, ela solicita ao usuário um local para
+        salvar o arquivo CSV resultante. Se ocorrer um erro, exibe uma
+        mensagem de erro.
+
+        Args:
+            sucesso (bool): True se o processamento foi concluído sem erros,
+                False caso contrário.
+            resultado (pd.DataFrame or str): O DataFrame processado em caso
+                de sucesso, ou uma string com a mensagem de erro.
+        """
         if sucesso:
             df_final = resultado
             # Abre a janela para o usuário escolher onde salvar
@@ -164,6 +232,11 @@ class App:
         self.resetar_interface()
 
     def resetar_interface(self):
+        """Reseta a interface do usuário para o estado inicial.
+
+        Reabilita o botão de seleção, desabilita o de processamento e limpa
+        as labels de status e a lista de arquivos.
+        """
         self.btn_selecionar.config(state="normal")
         self.btn_processar.config(state="disabled")
         self.label_arquivo.config(text="Nenhum arquivo selecionado")
